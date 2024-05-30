@@ -1,5 +1,8 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
+from instagram.tools.search import SearchTools
+from langchain_groq import ChatGroq
+import os
 
 # Uncomment the following line to use an example of a custom tool
 # from instagram.tools.custom_tool import MyCustomTool
@@ -13,34 +16,91 @@ class InstagramCrew():
 	agents_config = 'config/agents.yaml'
 	tasks_config = 'config/tasks.yaml'
 
-	@agent
-	def researcher(self) -> Agent:
-		return Agent(
-			config=self.agents_config['researcher'],
-			# tools=[MyCustomTool()], # Example of custom tool, loaded on the beginning of file
-			verbose=True
+	def __init__(self):
+		self.llm = ChatGroq(
+			api_key=os.getenv('GROQ_API_KEY'),
+			model='llama3-70b-8192'
 		)
 
 	@agent
-	def reporting_analyst(self) -> Agent:
+	def market_researcher(self) -> Agent:
 		return Agent(
-			config=self.agents_config['reporting_analyst'],
-			verbose=True
+			config=self.agents_config['market_researcher'],
+			tools=[
+              SearchTools.search_internet,
+              SearchTools.search_instagram,
+              SearchTools.open_page,
+            ],
+            verbose=True,
+			llm=self.llm,
+            # max_iter=2,
+		)
+	
+	@agent
+	def content_strategist(self) -> Agent:
+		return Agent(
+			config=self.agents_config['content_strategist'],
+			verbose=True,
+			llm=self.llm,
+            # max_iter=2,
+		)
+	
+	@agent
+	def visual_creator(self) -> Agent:
+		return Agent(
+			config=self.agents_config["visual_creator"],
+            verbose=True,
+            allow_delegation=False,
+			llm=self.llm,
+            # max_iter=2,
+		)
+	
+	@agent
+	def copywriter(self) -> Agent:
+		return Agent(
+			config=self.agents_config["copywriter"], 
+			verbose=True,
+			llm=self.llm,
+            # max_iter=2,
+		)
+
+
+	@task
+	def market_research(self) -> Task:
+		return Task(
+			config=self.tasks_config["market_research"],
+            agent=self.market_researcher(),
+            output_file="market_research.md",
 		)
 
 	@task
-	def research_task(self) -> Task:
+	def content_strategy_task(self) -> Task:
 		return Task(
-			config=self.tasks_config['research_task'],
-			agent=self.researcher()
+			config=self.tasks_config["content_strategy"],
+            agent=self.content_strategist(),
 		)
-
+	
 	@task
-	def reporting_task(self) -> Task:
+	def visual_content_creation_task(self) -> Task:
 		return Task(
-			config=self.tasks_config['reporting_task'],
-			agent=self.reporting_analyst(),
-			output_file='report.md'
+			config=self.tasks_config["visual_content_creation"],
+            agent=self.visual_creator(),
+            output_file="visual-content.md",
+		)
+	
+	@task
+	def copywriting_task(self) -> Task:
+		return Task(
+			config=self.tasks_config["copywriting"],
+            agent=self.copywriter(),
+		)
+	
+	@task
+	def report_final_content_strategy(self) -> Task:
+		return Task(
+			config=self.tasks_config["report_final_content_strategy"],
+            agent=self.content_strategist(),
+            output_file="final-content-strategy.md",
 		)
 
 	@crew
